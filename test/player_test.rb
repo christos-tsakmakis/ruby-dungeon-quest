@@ -3,6 +3,9 @@ require 'test_helper'
 class PlayerTest < Minitest::Test
   def setup
     @player = Player.new("TestHero")
+    @player.dodge_chance = 0
+    @player.block_chance = 0
+    @player.crit_chance = 0
     @sword = Weapon.new("Test Sword", "A test weapon", 5)
     @potion = Potion.new("Test Potion", "A test potion", 20)
     @room = Room.new("Test Room", "A test room")
@@ -103,8 +106,9 @@ class PlayerTest < Minitest::Test
   end
 
   def test_take_damage_reduces_health
-    actual_damage = @player.take_damage(15)
-    assert_equal 10, actual_damage
+    result = @player.take_damage(15)
+    assert_equal 10, result[:damage]
+    assert_equal false, result[:dodged]
     assert_equal 90, @player.health
   end
 
@@ -114,8 +118,8 @@ class PlayerTest < Minitest::Test
   end
 
   def test_take_damage_does_no_damage_if_attack_less_than_defense
-    actual_damage = @player.take_damage(3)
-    assert_equal 0, actual_damage
+    result = @player.take_damage(3)
+    assert_equal 0, result[:damage]
     assert_equal 100, @player.health
   end
 

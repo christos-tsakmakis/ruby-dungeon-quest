@@ -1,5 +1,5 @@
 class Player
-  attr_accessor :name, :health, :max_health, :attack_power, :defense
+  attr_accessor :name, :health, :max_health, :attack_power, :defense, :dodge_chance, :block_chance, :crit_chance, :crit_multiplier
   attr_reader :inventory, :current_room, :equipped_weapon, :equipped_armor
 
   def initialize(name)
@@ -8,6 +8,10 @@ class Player
     @max_health = 100
     @attack_power = 10
     @defense = 5
+    @dodge_chance = 0.15
+    @block_chance = 0.15
+    @crit_chance = 0.20
+    @crit_multiplier = 2.0
     @inventory = []
     @current_room = nil
     @equipped_weapon = nil
@@ -106,10 +110,25 @@ class Player
   end
 
   def take_damage(damage)
+    # Check for dodge (complete avoidance)
+    if rand < @dodge_chance
+      return { damage: 0, dodged: true, blocked: false }
+    end
+
+    # Check for block (50% damage reduction)
+    if rand < @block_chance
+      damage = (damage * 0.5).to_i
+      blocked = true
+    else
+      blocked = false
+    end
+
+    # Apply defense reduction
     actual_damage = [damage - @defense, 0].max
     @health -= actual_damage
     @health = [@health, 0].max
-    actual_damage
+
+    { damage: actual_damage, dodged: false, blocked: blocked }
   end
 
   def heal(amount)
@@ -161,6 +180,10 @@ class Player
       Health: #{@health}/#{@max_health}
       Attack Power: #{@attack_power}
       Defense: #{@defense}
+      Dodge Chance: #{(@dodge_chance * 100).round}%
+      Block Chance: #{(@block_chance * 100).round}%
+      Crit Chance: #{(@crit_chance * 100).round}%
+      Crit Multiplier: #{@crit_multiplier}x
       Weapon: #{weapon_name}
       Armor: #{armor_name}
       Items: #{@inventory.length}
@@ -174,6 +197,10 @@ class Player
       max_health: @max_health,
       attack_power: @attack_power,
       defense: @defense,
+      dodge_chance: @dodge_chance,
+      block_chance: @block_chance,
+      crit_chance: @crit_chance,
+      crit_multiplier: @crit_multiplier,
       inventory: @inventory.map { |item| item.respond_to?(:to_h) ? item.to_h : item.name },
       equipped_weapon: @equipped_weapon&.to_h,
       equipped_armor: @equipped_armor&.to_h
@@ -186,6 +213,10 @@ class Player
     player.max_health = data[:max_health] || data['max_health']
     player.attack_power = data[:attack_power] || data['attack_power']
     player.defense = data[:defense] || data['defense']
+    player.dodge_chance = data[:dodge_chance] || data['dodge_chance'] || 0.15
+    player.block_chance = data[:block_chance] || data['block_chance'] || 0.15
+    player.crit_chance = data[:crit_chance] || data['crit_chance'] || 0.20
+    player.crit_multiplier = data[:crit_multiplier] || data['crit_multiplier'] || 2.0
 
     inventory_data = data[:inventory] || data['inventory'] || []
     inventory_data.each do |item_data|
@@ -219,12 +250,18 @@ class Player
     @attack_power += item.attack_bonus if item.respond_to?(:attack_bonus)
     @defense += item.defense_bonus if item.respond_to?(:defense_bonus)
     @max_health += item.health_bonus if item.respond_to?(:health_bonus)
+    @dodge_chance += item.dodge_bonus if item.respond_to?(:dodge_bonus)
+    @block_chance += item.block_bonus if item.respond_to?(:block_bonus)
+    @crit_chance += item.crit_bonus if item.respond_to?(:crit_bonus)
   end
 
   def remove_item_effects(item)
     @attack_power -= item.attack_bonus if item.respond_to?(:attack_bonus)
     @defense -= item.defense_bonus if item.respond_to?(:defense_bonus)
     @max_health -= item.health_bonus if item.respond_to?(:health_bonus)
+    @dodge_chance -= item.dodge_bonus if item.respond_to?(:dodge_bonus)
+    @block_chance -= item.block_bonus if item.respond_to?(:block_bonus)
+    @crit_chance -= item.crit_bonus if item.respond_to?(:crit_bonus)
     @health = [@health, @max_health].min
   end
 end
