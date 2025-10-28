@@ -1,0 +1,15 @@
+#!/usr/bin/env ruby
+
+require_relative '../lib/game'
+
+begin
+  game = Game.new
+  game.start
+rescue Interrupt
+  puts "\n\nGame interrupted. Goodbye!"
+  exit 0
+rescue StandardError => e
+  puts "\nAn error occurred: #{e.message}"
+  puts e.backtrace.first(5).join("\n") if ENV['DEBUG']
+  exit 1
+end
