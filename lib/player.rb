@@ -1,6 +1,6 @@
 class Player
   attr_accessor :name, :health, :max_health, :attack_power, :defense
-  attr_reader :inventory, :current_room
+  attr_reader :inventory, :current_room, :equipped_weapon, :equipped_armor
 
   def initialize(name)
     @name = name
@@ -10,20 +10,22 @@ class Player
     @defense = 5
     @inventory = []
     @current_room = nil
+    @equipped_weapon = nil
+    @equipped_armor = nil
   end
 
   def add_item(item)
     raise ArgumentError, "Item cannot be nil" if item.nil?
 
     @inventory << item
-    apply_item_effects(item) if item.respond_to?(:equippable?) && item.equippable?
+    # No longer auto-equip - use equip command instead
   end
 
   def remove_item(item)
     return false unless @inventory.include?(item)
 
     @inventory.delete(item)
-    remove_item_effects(item) if item.respond_to?(:equippable?) && item.equippable?
+    # Note: This doesn't unequip the item, use unequip for that
     true
   end
 
@@ -43,6 +45,64 @@ class Player
     effect = item.use(self)
     remove_item(item) if item.consumable?
     effect
+  end
+
+  def equip(item_name)
+    item = get_item(item_name)
+    return "You don't have that item" unless item
+    return "That item cannot be equipped" unless item.respond_to?(:equippable?) && item.equippable?
+
+    if item.respond_to?(:attack_bonus)
+      # It's a weapon
+      unequip_weapon if @equipped_weapon
+      @equipped_weapon = item
+      remove_item(item)
+      apply_item_effects(item)
+      "Equipped #{item.name}"
+    elsif item.respond_to?(:defense_bonus)
+      # It's armor
+      unequip_armor if @equipped_armor
+      @equipped_armor = item
+      remove_item(item)
+      apply_item_effects(item)
+      "Equipped #{item.name}"
+    else
+      "Cannot equip #{item.name}"
+    end
+  end
+
+  def unequip_weapon
+    return "No weapon equipped" unless @equipped_weapon
+
+    item = @equipped_weapon
+    remove_item_effects(item)
+    @equipped_weapon = nil
+    add_item(item)
+    "Unequipped #{item.name}"
+  end
+
+  def unequip_armor
+    return "No armor equipped" unless @equipped_armor
+
+    item = @equipped_armor
+    remove_item_effects(item)
+    @equipped_armor = nil
+    add_item(item)
+    "Unequipped #{item.name}"
+  end
+
+  def unequip(item_name)
+    # Check if it's the equipped weapon
+    if @equipped_weapon && @equipped_weapon.name.downcase == item_name.downcase
+      return unequip_weapon
+    end
+
+    # Check if it's the equipped armor
+    if @equipped_armor && @equipped_armor.name.downcase == item_name.downcase
+      return unequip_armor
+    end
+
+    "That item is not equipped"
   end
 
   def take_damage(damage)
@@ -77,15 +137,32 @@ class Player
   def inventory_list
     return "Inventory is empty" if @inventory.empty?
 
-    @inventory.map.with_index { |item, i| "#{i + 1}. #{item.name} - #{item.description}" }.join("\n")
+    # Group items by name and count them
+    item_counts = Hash.new(0)
+    item_details = {}
+    @inventory.each do |item|
+      item_counts[item.name] += 1
+      item_details[item.name] = item.description
+    end
+
+    # Build inventory display
+    item_counts.map.with_index { |(name, count), i|
+      count_str = count > 1 ? " (x#{count})" : ""
+      "#{i + 1}. #{name}#{count_str} - #{item_details[name]}"
+    }.join("\n")
   end
 
   def stats
+    weapon_name = @equipped_weapon ? @equipped_weapon.name : "None"
+    armor_name = @equipped_armor ? @equipped_armor.name : "None"
+
     <<~STATS
       Name: #{@name}
       Health: #{@health}/#{@max_health}
       Attack Power: #{@attack_power}
       Defense: #{@defense}
+      Weapon: #{weapon_name}
+      Armor: #{armor_name}
       Items: #{@inventory.length}
     STATS
   end
@@ -97,7 +174,9 @@ class Player
       max_health: @max_health,
       attack_power: @attack_power,
       defense: @defense,
-      inventory: @inventory.map { |item| item.respond_to?(:to_h) ? item.to_h : item.name }
+      inventory: @inventory.map { |item| item.respond_to?(:to_h) ? item.to_h : item.name },
+      equipped_weapon: @equipped_weapon&.to_h,
+      equipped_armor: @equipped_armor&.to_h
     }
   end
 
@@ -114,6 +193,21 @@ class Player
         item = items_lookup[item_data[:name] || item_data['name']]
         player.add_item(item) if item
       end
+    end
+
+    # Restore equipped items
+    if data[:equipped_weapon] || data['equipped_weapon']
+      weapon_data = data[:equipped_weapon] || data['equipped_weapon']
+      weapon = items_lookup[weapon_data[:name] || weapon_data['name']]
+      player.instance_variable_set(:@equipped_weapon, weapon)
+      player.send(:apply_item_effects, weapon) if weapon
+    end
+
+    if data[:equipped_armor] || data['equipped_armor']
+      armor_data = data[:equipped_armor] || data['equipped_armor']
+      armor = items_lookup[armor_data[:name] || armor_data['name']]
+      player.instance_variable_set(:@equipped_armor, armor)
+      player.send(:apply_item_effects, armor) if armor
     end
 
     player

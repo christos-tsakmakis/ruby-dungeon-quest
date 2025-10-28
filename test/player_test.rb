@@ -27,21 +27,33 @@ class PlayerTest < Minitest::Test
     assert_equal "Item cannot be nil", error.message
   end
 
-  def test_add_item_applies_weapon_effects
+  def test_add_item_does_not_auto_equip
     @player.add_item(@sword)
+    assert_equal 10, @player.attack_power  # No auto-equip
+    assert_includes @player.inventory, @sword
+  end
+
+  def test_equip_weapon_applies_effects
+    @player.add_item(@sword)
+    @player.equip("Test Sword")
     assert_equal 15, @player.attack_power
+    assert_equal @sword, @player.equipped_weapon
+    refute_includes @player.inventory, @sword  # Moved from inventory to equipped
+  end
+
+  def test_unequip_weapon_removes_effects
+    @player.add_item(@sword)
+    @player.equip("Test Sword")
+    @player.unequip("Test Sword")
+    assert_equal 10, @player.attack_power
+    assert_nil @player.equipped_weapon
+    assert_includes @player.inventory, @sword  # Back in inventory
   end
 
   def test_remove_item_removes_from_inventory
     @player.add_item(@sword)
     @player.remove_item(@sword)
     refute_includes @player.inventory, @sword
-  end
-
-  def test_remove_item_removes_effects
-    @player.add_item(@sword)
-    @player.remove_item(@sword)
-    assert_equal 10, @player.attack_power
   end
 
   def test_remove_item_returns_false_when_not_in_inventory

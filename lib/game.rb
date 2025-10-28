@@ -29,7 +29,9 @@ class Game
 
   def setup_player
     print "Enter your character's name: "
-    name = gets.chomp
+    input = gets
+    return if input.nil?  # Handle EOF/Ctrl+D
+    name = input.chomp
     name = "Adventurer" if name.empty?
     @player = Player.new(name)
     puts "\nWelcome, #{@player.name}! Your adventure begins...\n\n"
@@ -44,6 +46,7 @@ class Game
     place_items_in_rooms
     place_enemies_in_rooms
     place_puzzles_in_rooms
+    lock_rooms
 
     @current_room = @rooms[:entrance]
     @player.move_to_room(@current_room)
@@ -54,8 +57,9 @@ class Game
     until @game_over
       display_room unless @current_room.visited
       print "\n> "
-      input = gets.chomp
-      process_command(input)
+      input = gets
+      break if input.nil?  # Handle EOF/Ctrl+D
+      process_command(input.chomp)
       check_game_state
     end
   end
@@ -76,8 +80,18 @@ class Game
       handle_drop(parsed[:args])
     when :use
       handle_use(parsed[:args])
+    when :equip
+      handle_equip(parsed[:args])
+    when :unequip
+      handle_unequip(parsed[:args])
     when :attack
       handle_attack(parsed[:args])
+    when :flee
+      handle_flee
+    when :unlock
+      handle_unlock(parsed[:args])
+    when :solve
+      handle_solve(parsed[:args])
     when :stats
       display_stats
     when :help
@@ -184,6 +198,28 @@ class Game
     end
   end
 
+  def handle_equip(args)
+    if args.empty?
+      puts "Equip what?"
+      return
+    end
+
+    item_name = args.join(' ')
+    result = @player.equip(item_name)
+    puts result
+  end
+
+  def handle_unequip(args)
+    if args.empty?
+      puts "Unequip what?"
+      return
+    end
+
+    item_name = args.join(' ')
+    result = @player.unequip(item_name)
+    puts result
+  end
+
   def handle_attack(args)
     unless @current_room.has_enemies?
       puts "There are no enemies to attack here."
@@ -241,6 +277,119 @@ class Game
     check_win_condition
   end
 
+  def handle_flee
+    unless @current_room.has_enemies?
+      puts "There are no enemies to flee from."
+      return
+    end
+
+    # 50% chance to escape
+    if rand < 0.5
+      # Find connected rooms
+      available_exits = @current_room.connections.keys
+      if available_exits.empty?
+        puts "You failed to flee! There's nowhere to run!"
+        return
+      end
+
+      # Pick random exit
+      exit_direction = available_exits.sample
+      target_room = @current_room.get_connected_room(exit_direction)
+
+      @player.move_to_room(target_room)
+      @current_room = target_room
+      puts "You successfully fled to the #{@current_room.name}!"
+      display_room(force: true)
+    else
+      puts "You failed to escape!"
+      # Enemy gets a free attack
+      enemy = @current_room.alive_enemies.first
+      if enemy
+        enemy_attack = enemy.attack(@player)
+        puts "#{enemy.name} attacks you as you try to flee for #{enemy_attack[:damage]} damage!"
+
+        if @player.dead?
+          puts "You have been defeated!"
+          @game_over = true
+        end
+      end
+    end
+  end
+
+  def handle_unlock(args)
+    if args.empty?
+      puts "Unlock which direction?"
+      return
+    end
+
+    direction = @input_handler.parse_direction(args.first)
+    unless direction
+      puts "Invalid direction."
+      return
+    end
+
+    target_room = @current_room.get_connected_room(direction)
+    unless target_room
+      puts "There is no exit in that direction."
+      return
+    end
+
+    unless target_room.locked?
+      puts "That room is not locked."
+      return
+    end
+
+    if target_room.required_key.nil?
+      # Room is locked but doesn't need a key, just unlock it
+      target_room.unlock
+      puts "You unlocked the door!"
+    else
+      # Check if player has the required key
+      if @player.has_item?(target_room.required_key)
+        target_room.unlock
+        puts "You used the #{target_room.required_key} to unlock the door!"
+      else
+        puts "You need a #{target_room.required_key} to unlock this door."
+      end
+    end
+  end
+
+  def handle_solve(args)
+    if args.empty?
+      puts "Solve what?"
+      return
+    end
+
+    # First word is puzzle name, rest is the answer
+    puzzle_name = args.first
+    answer = args[1..].join(' ')
+
+    if answer.empty?
+      puts "What is your answer?"
+      return
+    end
+
+    puzzle = @current_room.puzzles.find { |p| p.name.downcase.include?(puzzle_name.downcase) }
+    unless puzzle
+      puts "There is no puzzle called '#{puzzle_name}' here."
+      return
+    end
+
+    result = puzzle.attempt(answer)
+
+    if result[:success]
+      puts "Correct! You solved the puzzle!"
+      if result[:reward]
+        @current_room.add_item(result[:reward])
+        puts "You received: #{result[:reward].name}!"
+      end
+    else
+      puts "Incorrect! #{puzzle.attempts_left} attempts remaining."
+    end
+  rescue RuntimeError => e
+    puts e.message
+  end
+
   def handle_save(args)
     filename = args.empty? ? "quicksave" : args.join('_')
 
@@ -279,7 +428,9 @@ class Game
 
   def handle_quit
     print "Are you sure you want to quit? (y/n): "
-    response = gets.chomp.downcase
+    input = gets
+    return if input.nil?  # Handle EOF/Ctrl+D
+    response = input.chomp.downcase
     @game_over = true if response == 'y' || response == 'yes'
   end
 
@@ -358,12 +509,23 @@ class Game
   def restore_game_state(game_state)
     items_lookup = create_items_lookup
     puzzles_lookup = create_puzzles_lookup
+    enemies_lookup = create_enemies_lookup
 
-    @player = Player.from_h(game_state[:player], items_lookup)
+    # First pass: Create all rooms
+    rooms_lookup_by_name = {}
     @rooms = game_state[:rooms].transform_values do |room_data|
-      Room.from_h(room_data, items_lookup, puzzles_lookup)
+      room = Room.from_h(room_data, items_lookup, puzzles_lookup, enemies_lookup, {})
+      rooms_lookup_by_name[room.name] = room
+      room
     end
 
+    # Second pass: Restore connections between rooms
+    game_state[:rooms].each do |room_key, room_data|
+      room = @rooms[room_key.to_sym]
+      room.restore_connections(room_data, rooms_lookup_by_name)
+    end
+
+    @player = Player.from_h(game_state[:player], items_lookup)
     @current_room = @rooms[game_state[:current_room].to_sym]
     @player.move_to_room(@current_room)
   end
@@ -439,7 +601,13 @@ class Game
   end
 
   def place_puzzles_in_rooms
-    @rooms[:library].set_puzzle(@riddle)
+    @rooms[:library].add_puzzle(@riddle)
+    @riddle.set_reward(@shield)
+  end
+
+  def lock_rooms
+    # Lock the treasure room - requires Master Key (dropped by troll)
+    @rooms[:treasure_room].lock("Master Key")
   end
 
   def create_items_lookup
@@ -457,6 +625,15 @@ class Game
     {
       "Ancient Riddle" => @riddle,
       "Door Code" => @code_puzzle
+    }
+  end
+
+  def create_enemies_lookup
+    {
+      "Goblin Warrior" => @goblin,
+      "Cave Troll" => @troll,
+      "Dark Knight" => @dark_knight,
+      "Dark Lord" => @boss
     }
   end
 end
