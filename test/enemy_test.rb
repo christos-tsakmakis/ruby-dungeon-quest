@@ -3,7 +3,13 @@ require 'test_helper'
 class EnemyTest < Minitest::Test
   def setup
     @enemy = Enemy.new("Goblin", "A fierce goblin", 50, 12, 3)
+    @enemy.instance_variable_set(:@dodge_chance, 0)
+    @enemy.instance_variable_set(:@block_chance, 0)
+    @enemy.instance_variable_set(:@crit_chance, 0)
     @player = Player.new("Hero")
+    @player.dodge_chance = 0
+    @player.block_chance = 0
+    @player.crit_chance = 0
     @loot = Item.new("Gold", "Shiny gold")
   end
 
@@ -39,8 +45,9 @@ class EnemyTest < Minitest::Test
   end
 
   def test_take_damage_reduces_health
-    actual = @enemy.take_damage(10)
-    assert_equal 7, actual
+    result = @enemy.take_damage(10)
+    assert_equal 7, result[:damage]
+    assert_equal false, result[:dodged]
     assert_equal 43, @enemy.health
   end
 
@@ -84,7 +91,13 @@ end
 class BossTest < Minitest::Test
   def setup
     @boss = Boss.new("Dark Lord", "Evil boss", 100, 20, 10, "Fireball")
+    @boss.instance_variable_set(:@dodge_chance, 0)
+    @boss.instance_variable_set(:@block_chance, 0)
+    @boss.instance_variable_set(:@crit_chance, 0)
     @player = Player.new("Hero")
+    @player.dodge_chance = 0
+    @player.block_chance = 0
+    @player.crit_chance = 0
   end
 
   def test_creates_boss_with_special_ability

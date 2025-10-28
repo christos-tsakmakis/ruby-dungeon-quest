@@ -21,6 +21,7 @@ class Game
 
   def start
     display_welcome
+    display_help
     setup_player
     initialize_world
     game_loop
@@ -244,11 +245,22 @@ class Game
   def combat_round(enemy)
     puts "\n--- Combat Round ---"
 
+    # Player attack with critical hit chance
     player_damage = @player.attack_power + rand(-2..2)
+    is_crit = rand < @player.crit_chance
+    player_damage = (player_damage * @player.crit_multiplier).to_i if is_crit
     player_damage = [player_damage, 1].max
-    enemy_damage_taken = enemy.take_damage(player_damage)
+    enemy_damage_result = enemy.take_damage(player_damage)
 
-    puts "You attack #{enemy.name} for #{enemy_damage_taken} damage!"
+    # Display player attack result
+    if enemy_damage_result[:dodged]
+      puts "You attack #{enemy.name} but it DODGES!"
+    elsif enemy_damage_result[:blocked]
+      puts "You attack #{enemy.name} for #{enemy_damage_result[:damage]} damage! [BLOCKED]"
+    else
+      crit_msg = is_crit ? " CRITICAL HIT!" : ""
+      puts "You attack #{enemy.name} for #{enemy_damage_result[:damage]} damage!#{crit_msg}"
+    end
 
     if enemy.dead?
       puts "#{enemy.name} has been defeated!"
@@ -256,8 +268,18 @@ class Game
       return
     end
 
+    # Enemy attack
     enemy_attack = enemy.attack(@player)
-    puts "#{enemy.name} attacks you for #{enemy_attack[:damage]} damage!"
+
+    # Display enemy attack result
+    if enemy_attack[:dodged]
+      puts "#{enemy.name} attacks but you DODGE!"
+    elsif enemy_attack[:blocked]
+      puts "#{enemy.name} attacks you for #{enemy_attack[:damage]} damage! [BLOCKED]"
+    else
+      crit_msg = enemy_attack[:critical] ? " CRITICAL HIT!" : ""
+      puts "#{enemy.name} attacks you for #{enemy_attack[:damage]} damage!#{crit_msg}"
+    end
 
     if @player.dead?
       puts "You have been defeated!"
