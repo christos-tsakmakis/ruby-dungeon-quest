@@ -1,5 +1,5 @@
 class Room
-  attr_reader :name, :description, :items, :enemies, :puzzle
+  attr_reader :name, :description, :items, :enemies, :puzzles, :connections, :required_key
   attr_accessor :visited
 
   def initialize(name, description)
@@ -11,7 +11,7 @@ class Room
     @connections = {}
     @items = []
     @enemies = []
-    @puzzle = nil
+    @puzzles = []
     @visited = false
     @locked = false
     @required_key = nil
@@ -92,14 +92,14 @@ class Room
     "Enemies: #{alive_enemies.map(&:name).join(', ')}"
   end
 
-  def set_puzzle(puzzle)
+  def add_puzzle(puzzle)
     raise ArgumentError, "Puzzle cannot be nil" if puzzle.nil?
 
-    @puzzle = puzzle
+    @puzzles << puzzle
   end
 
   def has_puzzle?
-    !@puzzle.nil? && !@puzzle.solved?
+    @puzzles.any? { |p| !p.solved? }
   end
 
   def lock(required_key = nil)
@@ -143,11 +143,13 @@ class Room
       locked: @locked,
       required_key: @required_key,
       items: @items.map { |item| item.respond_to?(:to_h) ? item.to_h : { name: item.name } },
-      puzzle: @puzzle.respond_to?(:to_h) ? @puzzle.to_h : nil
+      puzzles: @puzzles.map { |p| p.respond_to?(:to_h) ? p.to_h : { name: p.name } },
+      enemies: @enemies.map { |e| e.respond_to?(:to_h) ? e.to_h : { name: e.name } },
+      connections: @connections.transform_values(&:name)
     }
   end
 
-  def self.from_h(data, items_lookup = {}, puzzles_lookup = {})
+  def self.from_h(data, items_lookup = {}, puzzles_lookup = {}, enemies_lookup = {}, rooms_lookup = {})
     room = new(data[:name] || data['name'], data[:description] || data['description'])
     room.visited = data[:visited] || data['visited'] || false
 
@@ -162,14 +164,31 @@ class Room
       room.add_item(item) if item
     end
 
-    puzzle_data = data[:puzzle] || data['puzzle']
-    if puzzle_data
+    puzzles_data = data[:puzzles] || data['puzzles'] || []
+    puzzles_data.each do |puzzle_data|
       puzzle_name = puzzle_data.is_a?(Hash) ? (puzzle_data[:name] || puzzle_data['name']) : puzzle_data
       puzzle = puzzles_lookup[puzzle_name]
-      room.set_puzzle(puzzle) if puzzle
+      room.add_puzzle(puzzle) if puzzle
     end
 
+    enemies_data = data[:enemies] || data['enemies'] || []
+    enemies_data.each do |enemy_data|
+      enemy_name = enemy_data.is_a?(Hash) ? (enemy_data[:name] || enemy_data['name']) : enemy_data
+      enemy = enemies_lookup[enemy_name]
+      room.add_enemy(enemy) if enemy
+    end
+
+    # Connections are restored in a second pass after all rooms exist
     room
+  end
+
+  def restore_connections(data, rooms_lookup)
+    connections_data = data[:connections] || data['connections'] || {}
+    connections_data.each do |direction, room_name|
+      direction_sym = direction.to_sym
+      connected_room = rooms_lookup[room_name]
+      @connections[direction_sym] = connected_room if connected_room
+    end
   end
 
   private
