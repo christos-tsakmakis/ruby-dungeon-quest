@@ -173,4 +173,23 @@ class PlayerTest < Minitest::Test
     assert_equal "Restored", restored.name
     assert_equal 75, restored.health
   end
+
+  def test_use_item_removes_only_one_instance_of_consumable
+    @player.health = 50
+    potion1 = Potion.new("Health Potion", "Healing", 20)
+    potion2 = Potion.new("Health Potion", "Healing", 20)
+    @player.add_item(potion1)
+    @player.add_item(potion2)
+    # Should have 2 potions
+    assert_equal 2, @player.inventory.count { |i| i.name == "Health Potion" }
+    # Use one potion
+    @player.use_item("Health Potion")
+    # Should have 1 potion left
+    assert_equal 1, @player.inventory.count { |i| i.name == "Health Potion" }
+  end
+
+  def test_player_initializes_with_10_percent_block_chance
+    player = Player.new("Test")
+    assert_equal 0.10, player.block_chance
+  end
 end

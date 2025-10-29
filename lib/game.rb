@@ -56,7 +56,6 @@ class Game
 
   def game_loop
     until @game_over
-      display_room unless @current_room.visited
       print "\n> "
       input = gets
       break if input.nil?  # Handle EOF/Ctrl+D
@@ -142,7 +141,7 @@ class Game
     @current_room = next_room
     @player.move_to_room(@current_room)
     @current_room.mark_visited
-    display_room
+    display_room(force: true)
   end
 
   def handle_look(args)
@@ -434,8 +433,18 @@ class Game
 
     # First word might be puzzle name or answer (if only 1 puzzle)
     if @current_room.puzzles.length == 1 && args.length >= 1
-      # Single puzzle room - treat all args as the answer
       puzzle = @current_room.puzzles.first
+
+      # Check if first arg looks like a puzzle name reference (not a real answer)
+      first_word = args.first.downcase
+      if first_word == "puzzle" || puzzle.name.downcase.include?(first_word)
+        # Looks like they're trying to reference the puzzle, show description
+        puts "\n#{puzzle.description}"
+        puts "\nType 'solve <answer>' to attempt the puzzle."
+        return
+      end
+
+      # Single puzzle room - treat all args as the answer
       answer = args.join(' ')
     else
       # Multiple puzzles - first arg is puzzle name, rest is answer
@@ -608,7 +617,7 @@ class Game
     end
 
     @player = Player.from_h(game_state[:player], items_lookup)
-    @current_room = @rooms[game_state[:current_room].to_sym]
+    @current_room = rooms_lookup_by_name[game_state[:current_room]]
     @player.move_to_room(@current_room)
   end
 
