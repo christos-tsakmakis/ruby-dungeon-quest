@@ -72,7 +72,7 @@ class Game
     when :move
       handle_move(parsed[:args])
     when :look
-      display_room(force: true)
+      handle_look(parsed[:args])
     when :inventory
       display_inventory
     when :take
@@ -143,6 +143,43 @@ class Game
     @player.move_to_room(@current_room)
     @current_room.mark_visited
     display_room
+  end
+
+  def handle_look(args)
+    # If no arguments, show the room
+    if args.empty?
+      display_room(force: true)
+      return
+    end
+
+    # Try to find and examine an item
+    item_name = args.join(' ')
+
+    # Check player inventory first
+    item = @player.get_item(item_name)
+
+    # If not in inventory, check room
+    item ||= @current_room.get_item(item_name)
+
+    if item
+      puts "\n==== #{item.name} ===="
+      puts item.description
+
+      # Show additional info for equipment
+      if item.is_a?(Weapon)
+        puts "Attack Bonus: +#{item.attack_bonus}"
+        puts "Crit Bonus: +#{(item.crit_bonus * 100).round}%" if item.crit_bonus > 0
+      elsif item.is_a?(Armor)
+        puts "Defense Bonus: +#{item.defense_bonus}"
+        puts "Dodge Bonus: +#{(item.dodge_bonus * 100).round}%" if item.dodge_bonus > 0
+        puts "Block Bonus: +#{(item.block_bonus * 100).round}%" if item.block_bonus > 0
+      elsif item.is_a?(Potion)
+        puts "Healing: #{item.heal_amount} HP"
+      end
+      puts "=" * (item.name.length + 10)
+    else
+      puts "You don't see '#{item_name}' here."
+    end
   end
 
   def handle_take(args)
@@ -377,26 +414,49 @@ class Game
   end
 
   def handle_solve(args)
+    # If no puzzle in room
+    if @current_room.puzzles.empty?
+      puts "There are no puzzles here."
+      return
+    end
+
+    # If no args, check if there's only one puzzle
     if args.empty?
-      puts "Solve what?"
+      if @current_room.puzzles.length == 1
+        puzzle = @current_room.puzzles.first
+        puts "\n#{puzzle.description}"
+        puts "\nType 'solve <answer>' to attempt the puzzle."
+      else
+        puts "There are multiple puzzles here. Specify which one: #{@current_room.puzzles.map(&:name).join(', ')}"
+      end
       return
     end
 
-    # First word is puzzle name, rest is the answer
-    puzzle_name = args.first
-    answer = args[1..].join(' ')
+    # First word might be puzzle name or answer (if only 1 puzzle)
+    if @current_room.puzzles.length == 1 && args.length >= 1
+      # Single puzzle room - treat all args as the answer
+      puzzle = @current_room.puzzles.first
+      answer = args.join(' ')
+    else
+      # Multiple puzzles - first arg is puzzle name, rest is answer
+      puzzle_name = args.first
+      answer = args[1..].join(' ')
 
-    if answer.empty?
-      puts "What is your answer?"
-      return
+      puzzle = @current_room.puzzles.find { |p| p.name.downcase.include?(puzzle_name.downcase) }
+      unless puzzle
+        puts "There is no puzzle called '#{puzzle_name}' here."
+        return
+      end
+
+      # If no answer provided, show the puzzle
+      if answer.empty?
+        puts "\n#{puzzle.description}"
+        puts "\nType 'solve #{puzzle_name} <answer>' to attempt the puzzle."
+        return
+      end
     end
 
-    puzzle = @current_room.puzzles.find { |p| p.name.downcase.include?(puzzle_name.downcase) }
-    unless puzzle
-      puts "There is no puzzle called '#{puzzle_name}' here."
-      return
-    end
-
+    # Attempt to solve
     result = puzzle.attempt(answer)
 
     if result[:success]
@@ -608,6 +668,9 @@ class Game
     @rooms[:library].connect(:north, @rooms[:treasure_room], bidirectional: true)
     @rooms[:treasure_room].connect(:west, @rooms[:throne_room], bidirectional: true)
     @rooms[:dungeon].connect(:north, @rooms[:throne_room], bidirectional: true)
+
+    # Lock the Treasure Room - requires Master Key
+    @rooms[:treasure_room].lock("Master Key")
   end
 
   def place_items_in_rooms

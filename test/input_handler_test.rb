@@ -103,4 +103,13 @@ class InputHandlerTest < Minitest::Test
     assert_includes help, "Movement"
     assert_includes help, "inventory"
   end
+
+  def test_help_text_includes_all_commands
+    help = @handler.help_text
+    assert_includes help, "equip"
+    assert_includes help, "unequip"
+    assert_includes help, "flee"
+    assert_includes help, "unlock"
+    assert_includes help, "solve"
+  end
 end

@@ -68,7 +68,16 @@ class InputHandler
         take/get <item> - Pick up an item
         drop <item> - Drop an item from inventory
         use <item> - Use or consume an item
+        equip <item> - Equip a weapon or armor
+        unequip <item> - Unequip a weapon or armor
+
+      Combat:
         attack/fight <enemy> - Attack an enemy
+        flee - Attempt to escape from combat (50% success rate)
+
+      Puzzles & Doors:
+        solve - Solve a puzzle in the current room
+        unlock <direction> - Unlock a locked door with a key
 
       Information:
         inventory/inv/i - View your inventory
