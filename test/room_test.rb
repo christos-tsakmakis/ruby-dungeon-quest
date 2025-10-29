@@ -102,7 +102,7 @@ class RoomTest < Minitest::Test
   def test_lock_without_key_requirement
     @room1.lock
     assert @room1.locked?
-    assert @room1.can_enter?(@player)
+    refute @room1.can_enter?(@player)
   end
 
   def test_lock_with_key_requirement
@@ -114,6 +114,11 @@ class RoomTest < Minitest::Test
     @room1.lock("Master Key")
     key = Key.new("Master Key", "A key")
     @player.add_item(key)
+    # Room is still locked until explicitly unlocked
+    refute @room1.can_enter?(@player)
+    # Now unlock it
+    @room1.unlock
+    # Now can enter
     assert @room1.can_enter?(@player)
   end
 

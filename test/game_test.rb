@@ -148,9 +148,65 @@ class GameTest < Minitest::Test
   def test_treasure_room_unlockable_with_master_key
     @game.instance_variable_set(:@player, Player.new("Test"))
     @game.initialize_world
+    # Move to library (south of treasure room)
+    @game.instance_variable_set(:@current_room, @game.rooms[:library])
+    @game.player.move_to_room(@game.rooms[:library])
     treasure_room = @game.rooms[:treasure_room]
+    # Give player master key
     master_key = Key.new("Master Key", "An ornate key")
     @game.player.add_item(master_key)
+    # Unlock the door
+    @game.handle_unlock(["north"])
+    # Now should be able to enter
     assert treasure_room.can_enter?(@game.player)
+  end
+
+  def test_handle_move_displays_room_automatically
+    @game.instance_variable_set(:@player, Player.new("Test"))
+    @game.initialize_world
+    # Moving to a new room should automatically display room description
+    assert_output(/ARMORY/m) { @game.handle_move(["north"]) }
+  end
+
+  def test_handle_solve_with_puzzle_word_shows_question
+    @game.instance_variable_set(:@player, Player.new("Test"))
+    @game.initialize_world
+    @game.instance_variable_set(:@current_room, @game.rooms[:library])
+    # "solve puzzle" should show question, not treat "puzzle" as answer
+    output = capture_io { @game.handle_solve(["puzzle"]) }.join
+    assert_match(/I speak without a mouth/m, output)
+    refute_match(/Incorrect/m, output)
+  end
+
+  def test_locked_room_blocks_entry_even_with_key
+    @game.instance_variable_set(:@player, Player.new("Test"))
+    @game.initialize_world
+    # Give player the master key
+    master_key = Key.new("Master Key", "An ornate key")
+    @game.player.add_item(master_key)
+    # Move to library
+    @game.instance_variable_set(:@current_room, @game.rooms[:library])
+    @game.player.move_to_room(@game.rooms[:library])
+    # Try to go north to treasure room - should be blocked
+    assert_output(/locked/i) { @game.handle_move(["north"]) }
+    # Should still be in library
+    assert_equal @game.rooms[:library], @game.current_room
+  end
+
+  def test_save_and_load_preserves_game_state
+    @game.instance_variable_set(:@player, Player.new("TestPlayer"))
+    @game.initialize_world
+    # Move to armory
+    @game.handle_move(["north"])
+    # Save game
+    @game.handle_save(["test_save_load"])
+    # Create new game and load
+    new_game = Game.new
+    new_game.handle_load(["test_save_load"])
+    # Should be in armory
+    assert_equal "Armory", new_game.current_room.name
+    assert_equal "TestPlayer", new_game.player.name
+    # Clean up
+    File.delete("saves/test_save_load.json") if File.exist?("saves/test_save_load.json")
   end
 end

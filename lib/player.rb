@@ -9,7 +9,7 @@ class Player
     @attack_power = 10
     @defense = 5
     @dodge_chance = 0.15
-    @block_chance = 0.15
+    @block_chance = 0.10
     @crit_chance = 0.20
     @crit_multiplier = 2.0
     @inventory = []
@@ -28,7 +28,7 @@ class Player
   def remove_item(item)
     return false unless @inventory.include?(item)
 
-    @inventory.delete(item)
+    @inventory.delete_at(@inventory.index(item))
     # Note: This doesn't unequip the item, use unequip for that
     true
   end

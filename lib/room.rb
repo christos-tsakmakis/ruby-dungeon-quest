@@ -116,10 +116,7 @@ class Room
   end
 
   def can_enter?(player)
-    return true unless @locked
-    return true if @required_key.nil?
-
-    player.has_item?(@required_key)
+    !@locked
   end
 
   def full_description
