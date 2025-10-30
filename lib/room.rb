@@ -1,5 +1,5 @@
 class Room
-  attr_reader :name, :description, :items, :enemies, :puzzles, :connections, :required_key
+  attr_reader :name, :description, :items, :enemies, :puzzles, :npcs, :connections, :required_key
   attr_accessor :visited
 
   def initialize(name, description)
@@ -12,6 +12,7 @@ class Room
     @items = []
     @enemies = []
     @puzzles = []
+    @npcs = []
     @visited = false
     @locked = false
     @required_key = nil
@@ -102,6 +103,26 @@ class Room
     @puzzles.any? { |p| !p.solved? }
   end
 
+  def add_npc(npc)
+    raise ArgumentError, "NPC cannot be nil" if npc.nil?
+
+    @npcs << npc
+  end
+
+  def has_npcs?
+    !@npcs.empty?
+  end
+
+  def get_npc(npc_name)
+    @npcs.find { |npc| npc.name.downcase.include?(npc_name.downcase) }
+  end
+
+  def npcs_description
+    return "" if @npcs.empty?
+
+    "NPCs: #{@npcs.map(&:name).join(', ')}"
+  end
+
   def lock(required_key = nil)
     @locked = true
     @required_key = required_key
@@ -123,6 +144,7 @@ class Room
     parts = [@description]
     parts << items_description unless @items.empty?
     parts << enemies_description if has_enemies?
+    parts << npcs_description if has_npcs?
     parts << "There is a puzzle here" if has_puzzle?
     parts << exits_description
     parts.join("\n")
@@ -142,11 +164,12 @@ class Room
       items: @items.map { |item| item.respond_to?(:to_h) ? item.to_h : { name: item.name } },
       puzzles: @puzzles.map { |p| p.respond_to?(:to_h) ? p.to_h : { name: p.name } },
       enemies: @enemies.map { |e| e.respond_to?(:to_h) ? e.to_h : { name: e.name } },
+      npcs: @npcs.map { |npc| npc.respond_to?(:to_h) ? npc.to_h : { name: npc.name } },
       connections: @connections.transform_values(&:name)
     }
   end
 
-  def self.from_h(data, items_lookup = {}, puzzles_lookup = {}, enemies_lookup = {}, rooms_lookup = {})
+  def self.from_h(data, items_lookup = {}, puzzles_lookup = {}, enemies_lookup = {}, npcs_lookup = {}, rooms_lookup = {})
     room = new(data[:name] || data['name'], data[:description] || data['description'])
     room.visited = data[:visited] || data['visited'] || false
 
@@ -173,6 +196,13 @@ class Room
       enemy_name = enemy_data.is_a?(Hash) ? (enemy_data[:name] || enemy_data['name']) : enemy_data
       enemy = enemies_lookup[enemy_name]
       room.add_enemy(enemy) if enemy
+    end
+
+    npcs_data = data[:npcs] || data['npcs'] || []
+    npcs_data.each do |npc_data|
+      npc_name = npc_data.is_a?(Hash) ? (npc_data[:name] || npc_data['name']) : npc_data
+      npc = npcs_lookup[npc_name]
+      room.add_npc(npc) if npc
     end
 
     # Connections are restored in a second pass after all rooms exist
