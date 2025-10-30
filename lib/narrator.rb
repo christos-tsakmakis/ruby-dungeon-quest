@@ -109,6 +109,13 @@ class Narrator
         "Intelligence would be their weapon against this {puzzle}.",
         "They examined the {puzzle} carefully."
       ],
+      talk: [
+        "The hero engaged {npc} in conversation.",
+        "Words were exchanged with {npc}.",
+        "The hero listened carefully to {npc}'s words.",
+        "{npc} had much to say to the brave adventurer.",
+        "A moment of dialogue with {npc} might prove enlightening."
+      ],
       death: [
         "And so, the hero's tale came to a tragic end...",
         "Darkness claimed the brave adventurer. Their quest was over.",

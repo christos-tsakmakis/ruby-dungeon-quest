@@ -46,10 +46,12 @@ class Game
     create_items
     create_enemies
     create_puzzles
+    create_npcs
     connect_rooms
     place_items_in_rooms
     place_enemies_in_rooms
     place_puzzles_in_rooms
+    place_npcs_in_rooms
     lock_rooms
 
     @current_room = @rooms[:entrance]
@@ -95,6 +97,8 @@ class Game
       handle_unlock(parsed[:args])
     when :solve
       handle_solve(parsed[:args])
+    when :talk
+      handle_talk(parsed[:args])
     when :stats
       display_stats
     when :narrator
@@ -617,6 +621,29 @@ class Game
     end
   end
 
+  def handle_talk(args)
+    if args.empty?
+      puts "Talk to whom?"
+      return
+    end
+
+    npc_name = args.join(' ')
+    npc = @current_room.get_npc(npc_name)
+
+    unless npc
+      puts "There is no '#{npc_name}' here to talk to."
+      return
+    end
+
+    dialogue = npc.talk
+
+    # Narrator commentary
+    commentary = @narrator.narrate(:talk, npc: npc.name)
+    puts commentary if commentary
+
+    puts "#{npc.name} says: \"#{dialogue}\""
+  end
+
   def display_room(force: false)
     return if @current_room.visited && !force
 
@@ -720,11 +747,12 @@ class Game
     items_lookup = create_items_lookup
     puzzles_lookup = create_puzzles_lookup
     enemies_lookup = create_enemies_lookup
+    npcs_lookup = create_npcs_lookup
 
     # First pass: Create all rooms
     rooms_lookup_by_name = {}
     @rooms = game_state[:rooms].transform_values do |room_data|
-      room = Room.from_h(room_data, items_lookup, puzzles_lookup, enemies_lookup, {})
+      room = Room.from_h(room_data, items_lookup, puzzles_lookup, enemies_lookup, npcs_lookup, {})
       rooms_lookup_by_name[room.name] = room
       room
     end
@@ -749,6 +777,11 @@ class Game
     @rooms[:dungeon] = Room.new("Dungeon", "Dark cells line the walls. The smell of decay fills the air.")
     @rooms[:treasure_room] = Room.new("Treasure Room", "Gold and jewels are scattered everywhere. But something guards this place...")
     @rooms[:throne_room] = Room.new("Throne Room", "A massive chamber with a dark throne. The final boss awaits!")
+    @rooms[:guard_quarters] = Room.new("Guard Quarters", "Sparse quarters for the tower guards. Bunks line the walls, covered in dust.")
+    @rooms[:courtyard] = Room.new("Courtyard", "An open courtyard with cracked stone tiles. Dead vines cling to the walls.")
+    @rooms[:kitchen] = Room.new("Kitchen", "An abandoned kitchen with rusty pots and moldy food. The hearth is cold.")
+    @rooms[:chapel] = Room.new("Chapel", "A small chapel with broken stained glass windows. An altar stands at the far end.")
+    @rooms[:tower_stairs] = Room.new("Tower Stairs", "A spiral staircase leading upward. Torches flicker along the walls.")
   end
 
   def create_items
@@ -774,6 +807,58 @@ class Game
     @boss.add_loot(@magic_potion)
   end
 
+  def create_npcs
+    @old_guard = NPC.new(
+      "Old Guard",
+      "A weathered guard with gray hair and tired eyes",
+      [
+        "The armory hasn't been restocked in years. We're running low on everything.",
+        "I've seen many brave souls enter this tower. Few return.",
+        "The Dark Lord's power grows stronger each day. Be careful, adventurer."
+      ]
+    )
+
+    @wounded_soldier = NPC.new(
+      "Wounded Soldier",
+      "A soldier clutching a bleeding wound on his arm",
+      [
+        "Beware the Dark Knight in the treasure room! His blade is swift and deadly.",
+        "I barely escaped with my life. Turn back while you still can!",
+        "The princess... she's somewhere in the upper floors. Please, save her!"
+      ]
+    )
+
+    @old_cook = NPC.new(
+      "Old Cook",
+      "An elderly cook with flour-dusted clothes",
+      [
+        "This kitchen once served the finest meals in the kingdom.",
+        "The servants fled when the Dark Lord arrived. I stayed to maintain what I could.",
+        "There's a secret passage behind the library, or so the old stories say."
+      ]
+    )
+
+    @priest = NPC.new(
+      "Priest",
+      "A solemn priest in tattered robes",
+      [
+        "May the light guide your path through this darkness.",
+        "The princess prayed here often before she was taken. Her faith never wavered.",
+        "I can offer you my blessing, but the battle ahead is yours alone."
+      ]
+    )
+
+    @princess = NPC.new(
+      "Princess Elena",
+      "A regal woman with kind eyes, dressed in a torn gown",
+      [
+        "You came! I knew someone would answer my father's call for help.",
+        "The Dark Lord kept me locked away, but now I'm free thanks to you.",
+        "The kingdom will sing songs of your bravery for generations to come!"
+      ]
+    )
+  end
+
   def create_puzzles
     @riddle = RiddlePuzzle.new(
       "Ancient Riddle",
@@ -790,12 +875,20 @@ class Game
   end
 
   def connect_rooms
+    # Original connections
     @rooms[:entrance].connect(:north, @rooms[:armory], bidirectional: true)
     @rooms[:entrance].connect(:east, @rooms[:library], bidirectional: true)
     @rooms[:armory].connect(:west, @rooms[:dungeon], bidirectional: true)
     @rooms[:library].connect(:north, @rooms[:treasure_room], bidirectional: true)
     @rooms[:treasure_room].connect(:west, @rooms[:throne_room], bidirectional: true)
     @rooms[:dungeon].connect(:north, @rooms[:throne_room], bidirectional: true)
+
+    # New room connections
+    @rooms[:entrance].connect(:west, @rooms[:courtyard], bidirectional: true)
+    @rooms[:armory].connect(:east, @rooms[:guard_quarters], bidirectional: true)
+    @rooms[:courtyard].connect(:north, @rooms[:kitchen], bidirectional: true)
+    @rooms[:courtyard].connect(:south, @rooms[:chapel], bidirectional: true)
+    @rooms[:throne_room].connect(:up, @rooms[:tower_stairs], bidirectional: true)
 
     # Lock the Treasure Room - requires Master Key
     @rooms[:treasure_room].lock("Master Key")
@@ -816,6 +909,14 @@ class Game
   def place_puzzles_in_rooms
     @rooms[:library].add_puzzle(@riddle)
     @riddle.set_reward(@shield)
+  end
+
+  def place_npcs_in_rooms
+    @rooms[:guard_quarters].add_npc(@old_guard)
+    @rooms[:courtyard].add_npc(@wounded_soldier)
+    @rooms[:kitchen].add_npc(@old_cook)
+    @rooms[:chapel].add_npc(@priest)
+    @rooms[:tower_stairs].add_npc(@princess)
   end
 
   def lock_rooms
@@ -847,6 +948,16 @@ class Game
       "Cave Troll" => @troll,
       "Dark Knight" => @dark_knight,
       "Dark Lord" => @boss
+    }
+  end
+
+  def create_npcs_lookup
+    {
+      "Old Guard" => @old_guard,
+      "Wounded Soldier" => @wounded_soldier,
+      "Old Cook" => @old_cook,
+      "Priest" => @priest,
+      "Princess Elena" => @princess
     }
   end
 end

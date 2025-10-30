@@ -133,4 +133,66 @@ class RoomTest < Minitest::Test
     @room1.mark_visited
     assert @room1.visited
   end
+
+  def test_add_npc_adds_to_room
+    npc = NPC.new("Guard", "An old guard", ["Hello"])
+    @room1.add_npc(npc)
+    assert @room1.has_npcs?
+  end
+
+  def test_add_npc_raises_error_for_nil
+    assert_raises(ArgumentError) { @room1.add_npc(nil) }
+  end
+
+  def test_has_npcs_returns_false_when_no_npcs
+    refute @room1.has_npcs?
+  end
+
+  def test_has_npcs_returns_true_when_npcs_present
+    npc = NPC.new("Guard", "An old guard", ["Hello"])
+    @room1.add_npc(npc)
+    assert @room1.has_npcs?
+  end
+
+  def test_get_npc_finds_by_name
+    npc = NPC.new("Old Guard", "An old guard", ["Hello"])
+    @room1.add_npc(npc)
+    found_npc = @room1.get_npc("Old Guard")
+    assert_equal npc, found_npc
+  end
+
+  def test_get_npc_is_case_insensitive
+    npc = NPC.new("Old Guard", "An old guard", ["Hello"])
+    @room1.add_npc(npc)
+    found_npc = @room1.get_npc("old guard")
+    assert_equal npc, found_npc
+  end
+
+  def test_get_npc_finds_by_partial_name
+    npc = NPC.new("Old Guard", "An old guard", ["Hello"])
+    @room1.add_npc(npc)
+    found_npc = @room1.get_npc("guard")
+    assert_equal npc, found_npc
+  end
+
+  def test_get_npc_returns_nil_when_not_found
+    npc_result = @room1.get_npc("Nonexistent")
+    assert_nil npc_result
+  end
+
+  def test_npcs_description_when_npcs_present
+    npc1 = NPC.new("Guard", "An old guard", ["Hello"])
+    npc2 = NPC.new("Merchant", "A traveling merchant", ["Hello"])
+    @room1.add_npc(npc1)
+    @room1.add_npc(npc2)
+
+    description = @room1.npcs_description
+    assert_includes description, "Guard"
+    assert_includes description, "Merchant"
+  end
+
+  def test_npcs_description_returns_empty_when_no_npcs
+    description = @room1.npcs_description
+    assert_empty description
+  end
 end

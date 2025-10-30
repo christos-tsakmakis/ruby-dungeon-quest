@@ -12,6 +12,7 @@ class InputHandler
     flee: %w[flee run escape retreat],
     unlock: %w[unlock open],
     solve: %w[solve answer attempt],
+    talk: %w[talk speak chat converse],
     stats: %w[stats status health],
     narrator: %w[narrator narration story],
     help: %w[help commands h ?],
@@ -71,6 +72,7 @@ class InputHandler
         use <item> - Use or consume an item
         equip <item> - Equip a weapon or armor
         unequip <item> - Unequip a weapon or armor
+        talk/speak <npc> - Talk to an NPC
 
       Combat:
         attack/fight <enemy> - Attack an enemy
