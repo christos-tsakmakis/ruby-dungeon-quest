@@ -13,6 +13,7 @@ class InputHandler
     unlock: %w[unlock open],
     solve: %w[solve answer attempt],
     stats: %w[stats status health],
+    narrator: %w[narrator narration story],
     help: %w[help commands h ?],
     save: %w[save],
     load: %w[load],
@@ -83,6 +84,9 @@ class InputHandler
         inventory/inv/i - View your inventory
         stats/status - View your character stats
         help - Show this help message
+
+      Settings:
+        narrator on/off - Toggle narrator commentary
 
       Game:
         save <filename> - Save your game

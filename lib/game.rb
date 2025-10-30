@@ -5,9 +5,10 @@ require_relative 'enemy'
 require_relative 'puzzle'
 require_relative 'save_manager'
 require_relative 'input_handler'
+require_relative 'narrator'
 
 class Game
-  attr_reader :player, :current_room, :rooms, :game_over
+  attr_reader :player, :current_room, :rooms, :game_over, :narrator
 
   def initialize
     @player = nil
@@ -15,6 +16,7 @@ class Game
     @current_room = nil
     @input_handler = InputHandler.new
     @save_manager = SaveManager.new
+    @narrator = Narrator.new
     @game_over = false
     @win_condition_met = false
   end
@@ -23,6 +25,7 @@ class Game
     display_welcome
     display_help
     setup_player
+    display_prologue
     initialize_world
     game_loop
     display_goodbye
@@ -94,6 +97,8 @@ class Game
       handle_solve(parsed[:args])
     when :stats
       display_stats
+    when :narrator
+      handle_narrator(parsed[:args])
     when :help
       display_help
     when :save
@@ -141,12 +146,21 @@ class Game
     @current_room = next_room
     @player.move_to_room(@current_room)
     @current_room.mark_visited
+
+    # Narrator commentary
+    commentary = @narrator.narrate(:move, direction: direction.to_s)
+    puts commentary if commentary
+
     display_room(force: true)
   end
 
   def handle_look(args)
     # If no arguments, show the room
     if args.empty?
+      # Narrator commentary for looking
+      commentary = @narrator.narrate(:look)
+      puts commentary if commentary
+
       display_room(force: true)
       return
     end
@@ -197,6 +211,11 @@ class Game
 
     @current_room.remove_item(item)
     @player.add_item(item)
+
+    # Narrator commentary
+    commentary = @narrator.narrate(:take, item: item.name)
+    puts commentary if commentary
+
     puts "You picked up #{item.name}."
   end
 
@@ -216,6 +235,11 @@ class Game
 
     @player.remove_item(item)
     @current_room.add_item(item)
+
+    # Narrator commentary
+    commentary = @narrator.narrate(:drop, item: item.name)
+    puts commentary if commentary
+
     puts "You dropped #{item.name}."
   end
 
@@ -226,6 +250,11 @@ class Game
     end
 
     item_name = args.join(' ')
+
+    # Narrator commentary (before use)
+    commentary = @narrator.narrate(:use, item: item_name)
+    puts commentary if commentary
+
     result = @player.use_item(item_name)
 
     if result.nil?
@@ -242,6 +271,11 @@ class Game
     end
 
     item_name = args.join(' ')
+
+    # Narrator commentary (before equip)
+    commentary = @narrator.narrate(:equip, item: item_name)
+    puts commentary if commentary
+
     result = @player.equip(item_name)
     puts result
   end
@@ -253,6 +287,11 @@ class Game
     end
 
     item_name = args.join(' ')
+
+    # Narrator commentary (before unequip)
+    commentary = @narrator.narrate(:unequip, item: item_name)
+    puts commentary if commentary
+
     result = @player.unequip(item_name)
     puts result
   end
@@ -281,6 +320,10 @@ class Game
   def combat_round(enemy)
     puts "\n--- Combat Round ---"
 
+    # Narrator commentary for attack
+    commentary = @narrator.narrate(:attack, enemy: enemy.name)
+    puts commentary if commentary
+
     # Player attack with critical hit chance
     player_damage = @player.attack_power + rand(-2..2)
     is_crit = rand < @player.crit_chance
@@ -288,12 +331,23 @@ class Game
     player_damage = [player_damage, 1].max
     enemy_damage_result = enemy.take_damage(player_damage)
 
-    # Display player attack result
+    # Display player attack result with additional narrator commentary
     if enemy_damage_result[:dodged]
+      # Narrator for enemy dodge
+      dodge_commentary = @narrator.narrate(:dodge, enemy: enemy.name)
+      puts dodge_commentary if dodge_commentary
       puts "You attack #{enemy.name} but it DODGES!"
     elsif enemy_damage_result[:blocked]
+      # Narrator for enemy block
+      block_commentary = @narrator.narrate(:block, enemy: enemy.name)
+      puts block_commentary if block_commentary
       puts "You attack #{enemy.name} for #{enemy_damage_result[:damage]} damage! [BLOCKED]"
     else
+      # Narrator for critical hit
+      if is_crit
+        crit_commentary = @narrator.narrate(:critical_hit, enemy: enemy.name)
+        puts crit_commentary if crit_commentary
+      end
       crit_msg = is_crit ? " CRITICAL HIT!" : ""
       puts "You attack #{enemy.name} for #{enemy_damage_result[:damage]} damage!#{crit_msg}"
     end
@@ -340,6 +394,10 @@ class Game
       puts "There are no enemies to flee from."
       return
     end
+
+    # Narrator commentary for fleeing
+    commentary = @narrator.narrate(:flee)
+    puts commentary if commentary
 
     # 50% chance to escape
     if rand < 0.5
@@ -400,11 +458,21 @@ class Game
     if target_room.required_key.nil?
       # Room is locked but doesn't need a key, just unlock it
       target_room.unlock
+
+      # Narrator commentary for unlock
+      commentary = @narrator.narrate(:unlock, direction: direction.to_s)
+      puts commentary if commentary
+
       puts "You unlocked the door!"
     else
       # Check if player has the required key
       if @player.has_item?(target_room.required_key)
         target_room.unlock
+
+        # Narrator commentary for unlock
+        commentary = @narrator.narrate(:unlock, direction: direction.to_s)
+        puts commentary if commentary
+
         puts "You used the #{target_room.required_key} to unlock the door!"
       else
         puts "You need a #{target_room.required_key} to unlock this door."
@@ -464,6 +532,10 @@ class Game
         return
       end
     end
+
+    # Narrator commentary for solve attempt
+    commentary = @narrator.narrate(:solve, puzzle: puzzle.name)
+    puts commentary if commentary
 
     # Attempt to solve
     result = puzzle.attempt(answer)
@@ -525,6 +597,26 @@ class Game
     @game_over = true if response == 'y' || response == 'yes'
   end
 
+  def handle_narrator(args)
+    if args.empty?
+      status = @narrator.enabled? ? "enabled" : "disabled"
+      puts "Narrator is currently #{status}. Use 'narrator on' or 'narrator off' to toggle."
+      return
+    end
+
+    command = args.first.downcase
+    case command
+    when 'on', 'enable', 'enabled'
+      @narrator.enable
+      puts "Narrator enabled."
+    when 'off', 'disable', 'disabled'
+      @narrator.disable
+      puts "Narrator disabled."
+    else
+      puts "Invalid option. Use 'narrator on' or 'narrator off'."
+    end
+  end
+
   def display_room(force: false)
     return if @current_room.visited && !force
 
@@ -563,6 +655,31 @@ class Game
     WELCOME
   end
 
+  def display_prologue
+    player_name = @player ? @player.name : "brave adventurer"
+
+    puts <<~PROLOGUE
+
+      ╔═══════════════════════════════════════════════╗
+      ║                 THE LEGEND BEGINS             ║
+      ╚═══════════════════════════════════════════════╝
+
+      Long ago, the kingdom lived in peace under the
+      rule of King Aldric and his beloved daughter,
+      Princess Elena. But one fateful night, the Dark
+      Lord emerged from the shadows and kidnapped the
+      princess, imprisoning her in his tower fortress.
+
+      You are #{player_name}, a brave adventurer who
+      has volunteered to rescue Princess Elena and
+      defeat the Dark Lord. The tower looms before you,
+      filled with monsters, traps, and dark magic.
+
+      Your quest begins now...
+
+    PROLOGUE
+  end
+
   def display_goodbye
     if @win_condition_met
       puts <<~WIN
@@ -572,8 +689,10 @@ class Game
         ╚═══════════════════════════════════════════════╝
 
         You have conquered the Dark Tower and defeated
-        all its monsters! Your name will be remembered
-        in legends!
+        the Dark Lord! Princess Elena is free at last,
+        and peace has returned to the kingdom.
+
+        Your name will be remembered in legends!
 
       WIN
     else

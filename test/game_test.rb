@@ -209,4 +209,77 @@ class GameTest < Minitest::Test
     # Clean up
     File.delete("saves/test_save_load.json") if File.exist?("saves/test_save_load.json")
   end
+
+  def test_game_has_narrator
+    assert_instance_of Narrator, @game.narrator
+  end
+
+  def test_narrator_enabled_by_default
+    assert @game.narrator.enabled?
+  end
+
+  def test_display_prologue_shows_backstory
+    output = capture_io { @game.display_prologue }.join
+    assert_match(/Dark Lord/i, output)
+    assert_match(/Princess/i, output)
+    assert_match(/kingdom/i, output)
+  end
+
+  def test_victory_message_mentions_princess
+    @game.instance_variable_set(:@player, Player.new("Test"))
+    @game.instance_variable_set(:@win_condition_met, true)
+    output = capture_io { @game.display_goodbye }.join
+    assert_match(/princess/i, output)
+  end
+
+  def test_narrator_comments_on_movement
+    @game.instance_variable_set(:@player, Player.new("Test"))
+    @game.initialize_world
+
+    # Get output without narrator
+    @game.narrator.disable
+    output_without = capture_io { @game.handle_move(["north"]) }.join
+
+    # Reset position and get output with narrator
+    @game.instance_variable_set(:@current_room, @game.rooms[:entrance])
+    @game.player.move_to_room(@game.current_room)
+    @game.narrator.enable
+    output_with = capture_io { @game.handle_move(["north"]) }.join
+
+    # With narrator should have more content
+    assert output_with.length > output_without.length, "Narrator should add commentary to output"
+  end
+
+  def test_narrator_can_be_disabled
+    @game.instance_variable_set(:@player, Player.new("Test"))
+    @game.initialize_world
+    @game.narrator.disable
+    output = capture_io { @game.handle_move(["north"]) }.join
+    # Should NOT contain narrator commentary when disabled
+    refute_match(/hero|adventurer|ventured/i, output)
+  end
+
+  def test_handle_narrator_shows_status_without_args
+    output = capture_io { @game.handle_narrator([]) }.join
+    assert_match(/enabled|disabled/i, output)
+  end
+
+  def test_handle_narrator_enables_narrator
+    @game.narrator.disable
+    output = capture_io { @game.handle_narrator(["on"]) }.join
+    assert @game.narrator.enabled?
+    assert_match(/enabled/i, output)
+  end
+
+  def test_handle_narrator_disables_narrator
+    @game.narrator.enable
+    output = capture_io { @game.handle_narrator(["off"]) }.join
+    refute @game.narrator.enabled?
+    assert_match(/disabled/i, output)
+  end
+
+  def test_handle_narrator_invalid_option
+    output = capture_io { @game.handle_narrator(["invalid"]) }.join
+    assert_match(/invalid/i, output)
+  end
 end
