@@ -59,6 +59,8 @@ class Item
       )
     when :key
       Key.new(name, description)
+    when :map
+      Map.new(name, description)
     else
       new(name, description, type)
     end
@@ -140,6 +142,16 @@ end
 class Key < Item
   def initialize(name, description)
     super(name, description, :key)
+  end
+
+  def usable?
+    false
+  end
+end
+
+class Map < Item
+  def initialize(name, description)
+    super(name, description, :map)
   end
 
   def usable?

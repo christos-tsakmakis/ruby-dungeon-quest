@@ -282,4 +282,61 @@ class GameTest < Minitest::Test
     output = capture_io { @game.handle_narrator(["invalid"]) }.join
     assert_match(/invalid/i, output)
   end
+
+  def test_map_item_exists_in_entrance
+    @game.instance_variable_set(:@player, Player.new("Test"))
+    @game.initialize_world
+    assert @game.current_room.has_item?("Tower Map"), "Map should be in entrance hall"
+  end
+
+  def test_handle_look_map_displays_map
+    @game.instance_variable_set(:@player, Player.new("Test"))
+    @game.initialize_world
+    output = capture_io { @game.handle_look(["Tower", "Map"]) }.join
+    assert_match(/DARK TOWER MAP/i, output)
+    assert_match(/Legend:/i, output)
+  end
+
+  def test_map_shows_current_location
+    @game.instance_variable_set(:@player, Player.new("Test"))
+    @game.initialize_world
+    output = capture_io { @game.handle_look(["Tower", "Map"]) }.join
+    # Should show [X] for current location (Entrance)
+    assert_match(/\[X\]/, output)
+  end
+
+  def test_map_shows_visited_rooms
+    @game.instance_variable_set(:@player, Player.new("Test"))
+    @game.initialize_world
+    # Take the map first
+    @game.handle_take(["Tower", "Map"])
+    # Move to courtyard (west) which has no enemies, then move back
+    @game.handle_move(["west"])
+    @game.handle_move(["east"])
+    # Now we're back at entrance, courtyard should show as visited
+    output = capture_io { @game.handle_look(["Tower", "Map"]) }.join
+    # Should show [Courtyard] for visited room that's not current
+    assert_match(/\[Courtyard\]/, output)
+    # Should show [X] for current location (Entrance)
+    assert_match(/\[X\]/, output)
+    # Entrance is current, so should NOT show [Entrance] separately
+    refute_match(/\[Entrance\]/, output)
+  end
+
+  def test_map_shows_unvisited_rooms
+    @game.instance_variable_set(:@player, Player.new("Test"))
+    @game.initialize_world
+    output = capture_io { @game.handle_look(["Tower", "Map"]) }.join
+    # Should show [ ] for unvisited rooms
+    assert_match(/\[ \]/, output)
+  end
+
+  def test_map_legend_explains_symbols
+    @game.instance_variable_set(:@player, Player.new("Test"))
+    @game.initialize_world
+    output = capture_io { @game.handle_look(["Tower", "Map"]) }.join
+    assert_match(/\[X\] = Current location/, output)
+    assert_match(/\[Name\] = Visited room/, output)
+    assert_match(/\[ \] = Unvisited room/, output)
+  end
 end

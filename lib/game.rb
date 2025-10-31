@@ -193,6 +193,10 @@ class Game
         puts "Block Bonus: +#{(item.block_bonus * 100).round}%" if item.block_bonus > 0
       elsif item.is_a?(Potion)
         puts "Healing: #{item.heal_amount} HP"
+      elsif item.is_a?(Map)
+        puts
+        display_map
+        return
       end
       puts "=" * (item.name.length + 10)
     else
@@ -669,6 +673,54 @@ class Game
     puts "\n" + @input_handler.help_text
   end
 
+  def display_map
+    puts "=" * 50
+    puts "DARK TOWER MAP"
+    puts "=" * 50
+    puts
+
+    # Helper to format room name based on state
+    format_room = lambda do |room_key|
+      room = @rooms[room_key]
+      if room == @current_room
+        "[X]"
+      elsif room.visited
+        case room_key
+        when :tower_stairs then "[Tower]"
+        when :throne_room then "[Throne]"
+        when :treasure_room then "[Treasure]"
+        when :dungeon then "[Dungeon]"
+        when :armory then "[Armory]"
+        when :guard_quarters then "[Guard Q.]"
+        when :library then "[Library]"
+        when :entrance then "[Entrance]"
+        when :courtyard then "[Courtyard]"
+        when :kitchen then "[Kitchen]"
+        when :chapel then "[Chapel]"
+        end
+      else
+        "[ ]"
+      end
+    end
+
+    # Build the map layout line by line
+    puts "                                 #{format_room.call(:tower_stairs)}"
+    puts "                                       |"
+    puts "                         #{format_room.call(:dungeon)}--#{format_room.call(:throne_room)}--#{format_room.call(:treasure_room)}"
+    puts "                             |                     |"
+    puts "        #{format_room.call(:kitchen)}        #{format_room.call(:armory)}--#{format_room.call(:guard_quarters)}  #{format_room.call(:library)}"
+    puts "            |                |                     |"
+    puts "       #{format_room.call(:courtyard)}-------#{format_room.call(:entrance)}----------------+"
+    puts "            |"
+    puts "         #{format_room.call(:chapel)}"
+    puts
+    puts "Legend:"
+    puts "  [X] = Current location"
+    puts "  [Name] = Visited room"
+    puts "  [ ] = Unvisited room"
+    puts "=" * 50
+  end
+
   def display_welcome
     puts <<~WELCOME
 
@@ -792,6 +844,7 @@ class Game
     @master_key = Key.new("Master Key", "An ornate key that opens many doors")
     @magic_potion = Potion.new("Magic Elixir", "Restores 50 HP", 50)
     @legendary_sword = Weapon.new("Legendary Blade", "A sword infused with ancient power", 15)
+    @map = Map.new("Tower Map", "A detailed map of the Dark Tower")
   end
 
   def create_enemies
@@ -897,6 +950,7 @@ class Game
 
   def place_items_in_rooms
     @rooms[:entrance].add_item(@potion)
+    @rooms[:entrance].add_item(@map)
     @rooms[:armory].add_item(@sword)
   end
 
@@ -932,7 +986,8 @@ class Game
       "Health Potion" => @potion,
       "Master Key" => @master_key,
       "Magic Elixir" => @magic_potion,
-      "Legendary Blade" => @legendary_sword
+      "Legendary Blade" => @legendary_sword,
+      "Tower Map" => @map
     }
   end
 

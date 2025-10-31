@@ -90,7 +90,8 @@ class RoomTest < Minitest::Test
   end
 
   def test_has_enemies_returns_false_when_no_alive_enemies
-    @enemy.take_damage(100)
+    # Ensure enemy is dead by setting health directly
+    @enemy.instance_variable_set(:@health, 0)
     @room1.add_enemy(@enemy)
     refute @room1.has_enemies?
   end
