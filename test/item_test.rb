@@ -113,3 +113,32 @@ class KeyTest < Minitest::Test
     refute @key.usable?
   end
 end
+
+class MapTest < Minitest::Test
+  def setup
+    @map = Map.new("Tower Map", "A detailed map")
+  end
+
+  def test_creates_a_map_item
+    assert_equal "Tower Map", @map.name
+    assert_equal :map, @map.type
+  end
+
+  def test_usable_returns_false
+    refute @map.usable?
+  end
+
+  def test_serializes_map_item
+    hash = @map.to_h
+    assert_equal "Tower Map", hash[:name]
+    assert_equal :map, hash[:type]
+  end
+
+  def test_deserializes_map_item
+    hash = { name: "Test Map", description: "A test", type: :map }
+    map = Item.from_h(hash)
+    assert_instance_of Map, map
+    assert_equal "Test Map", map.name
+    assert_equal :map, map.type
+  end
+end
