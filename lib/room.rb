@@ -179,23 +179,41 @@ class Room
 
     items_data = data[:items] || data['items'] || []
     items_data.each do |item_data|
-      item_name = item_data.is_a?(Hash) ? (item_data[:name] || item_data['name']) : item_data
-      item = items_lookup[item_name]
-      room.add_item(item) if item
+      if item_data.is_a?(Hash)
+        # Restore from serialized state to create separate instances
+        item = Item.from_h(item_data)
+        room.add_item(item) if item
+      else
+        # Fallback to lookup for simple string references
+        item = items_lookup[item_data]
+        room.add_item(item) if item
+      end
     end
 
     puzzles_data = data[:puzzles] || data['puzzles'] || []
     puzzles_data.each do |puzzle_data|
-      puzzle_name = puzzle_data.is_a?(Hash) ? (puzzle_data[:name] || puzzle_data['name']) : puzzle_data
-      puzzle = puzzles_lookup[puzzle_name]
-      room.add_puzzle(puzzle) if puzzle
+      if puzzle_data.is_a?(Hash)
+        # Restore from serialized state to maintain puzzle state (solved, attempts)
+        puzzle = Puzzle.from_h(puzzle_data, items_lookup)
+        room.add_puzzle(puzzle) if puzzle
+      else
+        # Fallback to lookup for simple string references
+        puzzle = puzzles_lookup[puzzle_data]
+        room.add_puzzle(puzzle) if puzzle
+      end
     end
 
     enemies_data = data[:enemies] || data['enemies'] || []
     enemies_data.each do |enemy_data|
-      enemy_name = enemy_data.is_a?(Hash) ? (enemy_data[:name] || enemy_data['name']) : enemy_data
-      enemy = enemies_lookup[enemy_name]
-      room.add_enemy(enemy) if enemy
+      if enemy_data.is_a?(Hash)
+        # Restore from serialized state to maintain enemy state (health, alive/dead)
+        enemy = Enemy.from_h(enemy_data, items_lookup)
+        room.add_enemy(enemy) if enemy
+      else
+        # Fallback to lookup for simple string references
+        enemy = enemies_lookup[enemy_data]
+        room.add_enemy(enemy) if enemy
+      end
     end
 
     npcs_data = data[:npcs] || data['npcs'] || []

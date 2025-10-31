@@ -6,6 +6,7 @@ require_relative 'puzzle'
 require_relative 'save_manager'
 require_relative 'input_handler'
 require_relative 'narrator'
+require_relative 'npc'
 
 class Game
   attr_reader :player, :current_room, :rooms, :game_over, :narrator

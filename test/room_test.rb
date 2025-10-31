@@ -195,4 +195,75 @@ class RoomTest < Minitest::Test
     description = @room1.npcs_description
     assert_empty description
   end
+
+  # Save/Load Bug Tests - Issue #15
+  def test_puzzle_state_persists_through_serialization
+    # Create a puzzle and solve it
+    puzzle = RiddlePuzzle.new("Test Riddle", "What is 2+2?", "four")
+    reward = Item.new("Prize", "A prize")
+    puzzle.set_reward(reward)
+    puzzle.attempt("four")
+    assert puzzle.solved?, "Puzzle should be solved"
+
+    # Add it to a room and serialize
+    @room1.add_puzzle(puzzle)
+    room_data = @room1.to_h
+
+    # Create a lookup with an UNSOLVED puzzle (simulating original instance)
+    original_puzzle = RiddlePuzzle.new("Test Riddle", "What is 2+2?", "four")
+    original_puzzle.set_reward(Item.new("Prize", "A prize"))
+    refute original_puzzle.solved?, "Original puzzle should not be solved"
+    puzzles_lookup = { "Test Riddle" => original_puzzle }
+
+    # Restore the room
+    items_lookup = { "Prize" => reward }
+    restored_room = Room.from_h(room_data, items_lookup, puzzles_lookup, {}, {}, {})
+
+    # The restored puzzle should be solved (will fail with current bug)
+    restored_puzzle = restored_room.instance_variable_get(:@puzzles).first
+    assert restored_puzzle.solved?, "Restored puzzle should maintain solved state from save data"
+  end
+
+  def test_enemy_health_persists_through_serialization
+    # Create an enemy and damage it
+    enemy = Enemy.new("Test Goblin", "A test goblin", 50, 10)
+    enemy.take_damage(30)
+    assert_equal 20, enemy.health, "Enemy should have 20 HP"
+
+    # Add it to a room and serialize
+    @room1.add_enemy(enemy)
+    room_data = @room1.to_h
+
+    # Create a lookup with a FULL HEALTH enemy (simulating original instance)
+    original_enemy = Enemy.new("Test Goblin", "A test goblin", 50, 10)
+    assert_equal 50, original_enemy.health, "Original enemy should have full health"
+    enemies_lookup = { "Test Goblin" => original_enemy }
+
+    # Restore the room
+    restored_room = Room.from_h(room_data, {}, {}, enemies_lookup, {}, {})
+
+    # The restored enemy should have damaged health (will fail with current bug)
+    restored_enemy = restored_room.enemies.first
+    assert_equal 20, restored_enemy.health, "Restored enemy should maintain health from save data"
+  end
+
+  def test_items_are_separate_instances_after_restoration
+    # Create an item and add it to a room
+    item = Item.new("Shared Item", "An item")
+    @room1.add_item(item)
+    room_data = @room1.to_h
+
+    # Create a lookup with the same item instance
+    items_lookup = { "Shared Item" => item }
+
+    # Restore the room
+    restored_room = Room.from_h(room_data, items_lookup, {}, {}, {}, {})
+
+    # The restored item should be a different instance (to prevent shared references)
+    restored_item = restored_room.items.first
+
+    # If they're the same object, modifying one affects the other
+    # This test verifies items should be separate instances
+    refute_same item, restored_item, "Restored item should be a separate instance, not a shared reference"
+  end
 end
