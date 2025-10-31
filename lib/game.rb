@@ -423,6 +423,7 @@ class Game
 
       @player.move_to_room(target_room)
       @current_room = target_room
+      @current_room.mark_visited
       puts "You successfully fled to the #{@current_room.name}!"
       display_room(force: true)
     else
@@ -686,7 +687,7 @@ class Game
         "[X]"
       elsif room.visited
         case room_key
-        when :tower_stairs then "[Tower]"
+        when :tower_stairs then "[Tower Stairs]"
         when :throne_room then "[Throne]"
         when :treasure_room then "[Treasure]"
         when :dungeon then "[Dungeon]"
@@ -703,16 +704,28 @@ class Game
       end
     end
 
-    # Build the map layout line by line
-    puts "                                 #{format_room.call(:tower_stairs)}"
+    # Build the map layout line by line with fixed-width formatting
+    tower = format_room.call(:tower_stairs).ljust(14)
+    dungeon = format_room.call(:dungeon).ljust(10)
+    throne = format_room.call(:throne_room).ljust(9)
+    treasure = format_room.call(:treasure_room).ljust(11)
+    kitchen = format_room.call(:kitchen).ljust(10)
+    armory = format_room.call(:armory).ljust(9)
+    guard = format_room.call(:guard_quarters).ljust(10)
+    library = format_room.call(:library).ljust(9)
+    courtyard = format_room.call(:courtyard).ljust(12)
+    entrance = format_room.call(:entrance).ljust(10)
+    chapel = format_room.call(:chapel).ljust(8)
+
+    puts "                                 #{tower}"
     puts "                                       |"
-    puts "                         #{format_room.call(:dungeon)}--#{format_room.call(:throne_room)}--#{format_room.call(:treasure_room)}"
+    puts "                         #{dungeon}--#{throne}--#{treasure}"
     puts "                             |                     |"
-    puts "        #{format_room.call(:kitchen)}        #{format_room.call(:armory)}--#{format_room.call(:guard_quarters)}  #{format_room.call(:library)}"
+    puts "        #{kitchen}        #{armory}--#{guard}  #{library}"
     puts "            |                |                     |"
-    puts "       #{format_room.call(:courtyard)}-------#{format_room.call(:entrance)}----------------+"
+    puts "       #{courtyard}-------#{entrance}----------------+"
     puts "            |"
-    puts "         #{format_room.call(:chapel)}"
+    puts "         #{chapel}"
     puts
     puts "Legend:"
     puts "  [X] = Current location"
@@ -790,7 +803,8 @@ class Game
 
   def check_win_condition
     boss_room = @rooms[:throne_room]
-    if boss_room && !boss_room.has_enemies?
+    # Win condition: Dark Lord defeated AND talked to Princess Elena
+    if boss_room && !boss_room.has_enemies? && @princess.talked_count > 0
       @win_condition_met = true
       @game_over = true
     end
@@ -932,7 +946,7 @@ class Game
     # Original connections
     @rooms[:entrance].connect(:north, @rooms[:armory], bidirectional: true)
     @rooms[:entrance].connect(:east, @rooms[:library], bidirectional: true)
-    @rooms[:armory].connect(:west, @rooms[:dungeon], bidirectional: true)
+    @rooms[:armory].connect(:north, @rooms[:dungeon], bidirectional: true)
     @rooms[:library].connect(:north, @rooms[:treasure_room], bidirectional: true)
     @rooms[:treasure_room].connect(:west, @rooms[:throne_room], bidirectional: true)
     @rooms[:dungeon].connect(:north, @rooms[:throne_room], bidirectional: true)
