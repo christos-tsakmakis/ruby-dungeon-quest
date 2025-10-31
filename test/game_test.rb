@@ -339,4 +339,40 @@ class GameTest < Minitest::Test
     assert_match(/\[Name\] = Visited room/, output)
     assert_match(/\[ \] = Unvisited room/, output)
   end
+
+  def test_game_does_not_end_when_dark_lord_killed_without_talking_to_princess
+    @game.instance_variable_set(:@player, Player.new("Test"))
+    @game.initialize_world
+
+    # Kill all enemies in throne room (Dark Lord)
+    throne_room = @game.rooms[:throne_room]
+    throne_room.instance_variable_get(:@enemies).clear
+
+    # Check win condition
+    @game.send(:check_win_condition)
+
+    # Game should NOT be over yet (princess not talked to)
+    refute @game.instance_variable_get(:@game_over), "Game should not end without talking to Princess"
+    refute @game.instance_variable_get(:@win_condition_met), "Win condition should not be met"
+  end
+
+  def test_game_ends_when_dark_lord_killed_and_princess_talked_to
+    @game.instance_variable_set(:@player, Player.new("Test"))
+    @game.initialize_world
+
+    # Kill all enemies in throne room (Dark Lord)
+    throne_room = @game.rooms[:throne_room]
+    throne_room.instance_variable_get(:@enemies).clear
+
+    # Talk to Princess Elena
+    princess = @game.instance_variable_get(:@princess)
+    princess.talk
+
+    # Check win condition
+    @game.send(:check_win_condition)
+
+    # Game SHOULD be over now (Dark Lord dead AND princess talked to)
+    assert @game.instance_variable_get(:@game_over), "Game should end after defeating Dark Lord and talking to Princess"
+    assert @game.instance_variable_get(:@win_condition_met), "Win condition should be met"
+  end
 end
